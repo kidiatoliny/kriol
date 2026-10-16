@@ -44,6 +44,15 @@ jobs:
       - name: Stage artifact
         run: cmake --install build/release --prefix "$STAGE"
 
+      # The archive must run on a Mac without Homebrew.
+      - name: Check for Homebrew dylibs
+        run: |
+          otool -L "$STAGE/kriol"
+          if otool -L "$STAGE/kriol" | grep -q "$(brew --prefix)"; then
+            echo "kriol links against Homebrew libraries" >&2
+            exit 1
+          fi
+
       - uses: actions/upload-artifact@v6
         with:
           name: kriol-macos-arm64
