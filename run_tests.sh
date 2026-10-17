@@ -11,6 +11,16 @@ if [ -z "$KRIOL" ] || [ -z "$ROOT" ]; then
     exit 1
 fi
 
+# macOS has no GNU timeout; Homebrew's coreutils installs it as gtimeout.
+if command -v timeout >/dev/null 2>&1; then
+    TIMEOUT=timeout
+elif command -v gtimeout >/dev/null 2>&1; then
+    TIMEOUT=gtimeout
+else
+    echo "run_tests.sh needs GNU timeout (on macOS: brew install coreutils)" >&2
+    exit 1
+fi
+
 echo -e "\n~~ Running tests ~~\n"
 pass=0; fail=0
 failed_tests=""
@@ -61,7 +71,7 @@ describe_run() {
 runs_cleanly() {
     local source="$1" runner="$2" program="$3" out err status=0
     out=$(mktemp /tmp/kriol_out_XXXX); err=$(mktemp /tmp/kriol_err_XXXX)
-    timeout 5 $runner "$program" < "$(stdin_for "$source")" > "$out" 2> "$err" || status=$?
+    "$TIMEOUT" 5 $runner "$program" < "$(stdin_for "$source")" > "$out" 2> "$err" || status=$?
     local ok=1
     [ "$status" -eq 0 ] && matches_stdout "$source" "$out" || ok=0
     [ $ok -eq 1 ] || describe_run "$source" "$status" "$out" "$err"
@@ -75,7 +85,7 @@ runs_cleanly() {
 stops_as_expected() {
     local source="$1" runner="$2" program="$3" out err status=0 ok=1
     out=$(mktemp /tmp/kriol_out_XXXX); err=$(mktemp /tmp/kriol_err_XXXX)
-    timeout 5 $runner "$program" < "$(stdin_for "$source")" > "$out" 2> "$err" || status=$?
+    "$TIMEOUT" 5 $runner "$program" < "$(stdin_for "$source")" > "$out" 2> "$err" || status=$?
     local expected_status expected_message
     expected_status=$(directive "$source" exit)
     expected_message=$(directive "$source" expect)
@@ -131,7 +141,7 @@ done
 printf "  %-44s" "inline source text"
 tmpbin=$(mktemp /tmp/kriol_text_XXXX)
 if "$KRIOL" --text 'fn inisiu() { mostran("Kualeh, Mundu!"); }' -o "$tmpbin" 2>/dev/null && \
-   [ "$(timeout 5 "$tmpbin")" = "Kualeh, Mundu!" ]; then
+   [ "$("$TIMEOUT" 5 "$tmpbin")" = "Kualeh, Mundu!" ]; then
     echo " PASS"; pass=$((pass+1))
 else
     echo " FAIL"; record_failure "inline source text"
@@ -143,7 +153,7 @@ for level in 0 3; do
     printf "  %-44s" "optimization level $level"
     tmpbin=$(mktemp /tmp/kriol_opt_XXXX)
     if "$KRIOL" --opt-lvl "$level" --text 'fn inisiu() { int[3] a = [1, 2, 3]; mostran(a[2] / a[0]); }' -o "$tmpbin" 2>/dev/null && \
-       [ "$(timeout 5 "$tmpbin")" = "3" ]; then
+       [ "$("$TIMEOUT" 5 "$tmpbin")" = "3" ]; then
         echo " PASS"; pass=$((pass+1))
     else
         echo " FAIL"; record_failure "optimization level $level"
@@ -164,7 +174,7 @@ fi
 
 printf "  %-44s" "unhandled error stops the program"
 unhandled_status=0
-unhandled_out=$(timeout 5 "$tmpbin" 2>&1) || unhandled_status=$?
+unhandled_out=$("$TIMEOUT" 5 "$tmpbin" 2>&1) || unhandled_status=$?
 if [ "$unhandled_status" -ne 0 ] && echo "$unhandled_out" | grep -Fq "boom" && ! echo "$unhandled_out" | grep -Fq "never"; then
     echo " PASS"; pass=$((pass+1))
 else
@@ -246,7 +256,7 @@ fi
 
 printf "  %-44s" "cli: --ignore-extension"
 if "$KRIOL" --ignore-extension "$tmpdir/program.txt" -o "$tmpdir/program" 2>/dev/null && \
-   [ "$(timeout 5 "$tmpdir/program")" = "txt" ]; then
+   [ "$("$TIMEOUT" 5 "$tmpdir/program")" = "txt" ]; then
     echo " PASS"; pass=$((pass+1))
 else
     echo " FAIL"; record_failure "cli: --ignore-extension"
@@ -270,7 +280,7 @@ if [ -d "$ROOT/tests/fail" ]; then
         tmpbin=$(mktemp /tmp/kriol_fail_bin_XXXX)
         expected=$(sed -n 's|^// expect: ||p' "$f" | head -n 1)
 
-        if output=$(timeout 10 "$KRIOL" "$f" -o "$tmpbin" 2>&1); then
+        if output=$("$TIMEOUT" 10 "$KRIOL" "$f" -o "$tmpbin" 2>&1); then
             echo " FAIL (should have been rejected)"
             record_failure "$f"
         elif [ -n "$expected" ] && ! printf '%s' "$output" | grep -Fq -- "$expected"; then

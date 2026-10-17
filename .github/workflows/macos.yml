@@ -24,7 +24,7 @@ jobs:
           submodules: true
 
       - name: Install dependencies
-        run: brew install llvm@20 flex bison cmake zstd
+        run: brew install llvm@20 flex bison cmake zstd coreutils
 
       - name: Add LLVM 20, bison and flex to PATH
         run: |
