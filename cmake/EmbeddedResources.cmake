@@ -1,20 +1,35 @@
 set(GENERATED_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(KRIOL_EMBED_FILE_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/EmbedFile.cmake)
 
-# The probe embeds a byte above 0x7F: some compilers (Apple clang) give
-# #embed bytes as signed char in C++, which only fails on such bytes.
+# Probes #embed with a header made by EmbedFile.cmake itself. Clang 19 (and
+# the Apple clang based on it) rejects a file of two or more bytes whose first
+# byte is above 0x7F as narrowing in C++; macOS bitcode starts with 0xDE.
 set(_KRIOL_EMBED_PROBE ${CMAKE_CURRENT_BINARY_DIR}/embed_probe.bin)
-string(ASCII 222 _KRIOL_EMBED_PROBE_BYTE)
-file(WRITE ${_KRIOL_EMBED_PROBE} "${_KRIOL_EMBED_PROBE_BYTE}")
+set(_KRIOL_EMBED_PROBE_HEADER ${CMAKE_CURRENT_BINARY_DIR}/embed_probe.h)
+
+set(_KRIOL_EMBED_PROBE_BYTES)
+foreach(_KRIOL_BYTE RANGE 128 255)
+    string(ASCII ${_KRIOL_BYTE} _KRIOL_CHAR)
+    string(APPEND _KRIOL_EMBED_PROBE_BYTES "${_KRIOL_CHAR}")
+endforeach()
+file(WRITE ${_KRIOL_EMBED_PROBE} "${_KRIOL_EMBED_PROBE_BYTES}")
+
+execute_process(
+    COMMAND
+        ${CMAKE_COMMAND}
+        -DINPUT=${_KRIOL_EMBED_PROBE}
+        -DOUTPUT=${_KRIOL_EMBED_PROBE_HEADER}
+        -DSYMBOL=kriol_embed_probe
+        -DUSE_EMBED=ON
+        -P ${KRIOL_EMBED_FILE_SCRIPT}
+    COMMAND_ERROR_IS_FATAL ANY
+)
 
 include(CheckCXXSourceCompiles)
 set(CMAKE_REQUIRED_QUIET ON)
 check_cxx_source_compiles("
-    constexpr unsigned char data[] = {
-    #embed \"${_KRIOL_EMBED_PROBE}\"
-    };
-    static_assert(sizeof(data) == 1 && data[0] == 0xDE, \"#embed must give unsigned bytes\");
-    int main() { return data[0] == 0; }
+    #include \"${_KRIOL_EMBED_PROBE_HEADER}\"
+    int main() { return kriol_embed_probe[0] == 0x80 && kriol_embed_probe_len == 128 ? 0 : 1; }
 " KRIOL_HAVE_EMBED)
 unset(CMAKE_REQUIRED_QUIET)
 message(STATUS "Embedding resources with #embed: ${KRIOL_HAVE_EMBED}")
