@@ -20,11 +20,12 @@ if(NOT CMAKE_TOOLCHAIN_FILE)
         find_program(_CLANGPP NAMES clang++-20 clang++-19 clang++)
     endif()
 
-    if(_CLANG)
+    # A compiler given with -DCMAKE_<LANG>_COMPILER takes precedence.
+    if(_CLANG AND NOT CMAKE_C_COMPILER)
         set(CMAKE_C_COMPILER "${_CLANG}")
     endif()
 
-    if(_CLANGPP)
+    if(_CLANGPP AND NOT CMAKE_CXX_COMPILER)
         set(CMAKE_CXX_COMPILER "${_CLANGPP}")
     endif()
 endif()
@@ -122,6 +123,14 @@ if(WIN32 AND TARGET LLVMDebugInfoPDB)
         set_target_properties(LLVMDebugInfoPDB PROPERTIES INTERFACE_LINK_LIBRARIES "${_KRIOL_PDB_LIBS}")
         message(STATUS "Using DIA SDK: ${KRIOL_DIAGUIDS_LIBRARY}")
     endif()
+endif()
+
+# macOS has no system libzstd, so the Homebrew dylib LLVM links against would
+# have to be installed on every machine; link its static archive instead.
+if(APPLE AND TARGET zstd::libzstd_shared AND TARGET zstd::libzstd_static)
+    get_target_property(_KRIOL_ZSTD_STATIC zstd::libzstd_static IMPORTED_LOCATION)
+    set_target_properties(zstd::libzstd_shared PROPERTIES IMPORTED_LOCATION "${_KRIOL_ZSTD_STATIC}")
+    message(STATUS "Linking zstd statically: ${_KRIOL_ZSTD_STATIC}")
 endif()
 
 set(KRIOL_LLVM_COMPONENTS
