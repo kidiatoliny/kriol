@@ -306,7 +306,7 @@ Kriol is currently maintained by
 below:
 
 <a href="https://github.com/kriol-lang/kriol/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=kriol-lang/kriol" alt="Contributors" />
+  <img src="https://contrib.rocks/image?repo=kriol-lang/kriol&__v=1" alt="Contributors" />
 </a>
 
 <!-- The grid above is generated from the commit history by contrib.rocks and
