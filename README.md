@@ -1,5 +1,7 @@
 # 🦈 KriolLang
 
+[![Made in Cabo Verde](https://img.shields.io/badge/made%20in-caboverde-008751.svg?style=flat-square)](https://github.com/brocy/made-in-caboverde)
+
 **KriolLang** or **Kriol** is a programming language based on **Cape Verdean Creole**. It was made to be easy for anyone who understands Cape Verdean Creole, while keeping the versatility of the languages its syntax draws on: C, Go and Rust, with Liquid playing a part in the initial design too.
 
 ```kriol
