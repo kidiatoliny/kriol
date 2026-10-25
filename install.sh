@@ -30,6 +30,34 @@ sha256() {
     shasum -a 256 "$1" | cut -d ' ' -f 1
 }
 
+detect_platform() {
+    OS=$(uname -s)
+    ARCH=$(uname -m)
+
+    if [ "$OS" = Darwin ] && [ "$(sysctl -in hw.optional.arm64 2>/dev/null)" = 1 ]; then
+        ARCH=arm64
+    fi
+
+    case "$OS/$ARCH" in
+        Linux/x86_64 | Linux/amd64)
+            PLATFORM="linux-x86_64"
+            ARCHIVE_EXT="tar.xz"
+            TAR_FLAG="J"
+            ;;
+        Darwin/arm64)
+            PLATFORM="macos-arm64"
+            ARCHIVE_EXT="tar.gz"
+            TAR_FLAG="z"
+            ;;
+        *)
+            echo "error: no Kriol build for $OS $ARCH; supported: Linux x86_64, macOS arm64 (Apple silicon)" >&2
+            exit 1
+            ;;
+    esac
+}
+
+detect_platform
+
 PRE=0
 
 while [ $# -gt 0 ]; do
@@ -58,13 +86,13 @@ fi
 ASSET_URL=$(
     echo "$RELEASE_JSON" |
     grep '"browser_download_url":' |
-    grep 'linux-x86_64.tar.xz"' |
+    grep -F -e "-$PLATFORM.$ARCHIVE_EXT\"" |
     cut -d '"' -f 4 |
     head -n 1
 )
 
 if [ -z "$ASSET_URL" ]; then
-    echo "error: could not find Linux x86_64 release asset" >&2
+    echo "error: could not find a $PLATFORM release asset" >&2
     exit 1
 fi
 
@@ -76,16 +104,17 @@ if ! printf '%s\n' "$RELEASE_JSON" | grep -qF "\"$SUMS_URL\""; then
     exit 1
 fi
 
-TMPDIR=$(mktemp -d)
+# Not TMPDIR: macOS exports it, so reassigning it would leak into every child process.
+WORK_DIR=$(mktemp -d)
 
 cleanup() {
-    rm -rf "$TMPDIR"
+    rm -rf "$WORK_DIR"
 }
 
 trap cleanup EXIT INT TERM
 
-ARCHIVE="$TMPDIR/kriol.tar.xz"
-SUMS="$TMPDIR/SHA256SUMS.txt"
+ARCHIVE="$WORK_DIR/kriol.$ARCHIVE_EXT"
+SUMS="$WORK_DIR/SHA256SUMS.txt"
 
 echo "Downloading..."
 curl -fL "$ASSET_URL" -o "$ARCHIVE"
@@ -107,10 +136,10 @@ if [ "$(sha256 "$ARCHIVE")" != "$EXPECTED" ]; then
 fi
 
 echo "Extracting..."
-tar -xJf "$ARCHIVE" -C "$TMPDIR"
+tar -x${TAR_FLAG}f "$ARCHIVE" -C "$WORK_DIR"
 
 BINARY=$(
-    find "$TMPDIR" -type f -name kriol | head -n 1
+    find "$WORK_DIR" -type f -name kriol | head -n 1
 )
 
 if [ -z "$BINARY" ]; then
@@ -120,21 +149,33 @@ fi
 
 mkdir -p "$INSTALL_DIR"
 
-cp "$BINARY" "$INSTALL_DIR/kriol"
-chmod +x "$INSTALL_DIR/kriol"
+# Replace rather than overwrite: macOS kills a signed binary rewritten in place.
+cp "$BINARY" "$INSTALL_DIR/kriol.new"
+chmod +x "$INSTALL_DIR/kriol.new"
+mv -f "$INSTALL_DIR/kriol.new" "$INSTALL_DIR/kriol"
 
 echo
 echo "-> Kriol installed successfully at: $INSTALL_DIR/kriol"
 echo
 
-if ! printf '%s' "$PATH" | grep -q "$INSTALL_DIR"; then
-    echo "-> Make sure to add the Kriol your shell env:"
+if [ "$OS" = Darwin ] && ! xcode-select -p >/dev/null 2>&1; then
+    echo "-> Kriol links programs with clang; install the Xcode Command Line Tools:"
     echo
-    echo "     export PATH=\"\$HOME/.kriol:\$PATH\""
-    echo
-
-    echo "-> Then close and reopen the shell and try:"
-    echo
-    echo "     kriol --help"
+    echo "     xcode-select --install"
     echo
 fi
+
+case ":$PATH:" in
+    *":$INSTALL_DIR:"*) ;;
+    *)
+        echo "-> Make sure to add the Kriol your shell env:"
+        echo
+        echo "     export PATH=\"\$HOME/.kriol:\$PATH\""
+        echo
+
+        echo "-> Then close and reopen the shell and try:"
+        echo
+        echo "     kriol --help"
+        echo
+        ;;
+esac
