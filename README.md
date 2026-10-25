@@ -55,6 +55,35 @@ export PATH="$HOME/.kriol:$PATH"
 
 Then close and reopen the shell and try `kriol --version`.
 
+### macOS
+
+Kriol runs on Macs with Apple silicon (M1 or newer). Intel Macs are not
+supported yet.
+
+Kriol links programs with `clang`, which comes with the Xcode Command Line
+Tools. If you don't have them yet, install them with:
+
+```sh
+xcode-select --install
+```
+
+Then install Kriol with the same command as on Linux:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/kriol-lang/kriol/refs/heads/main/install.sh | sh -s -- --pre
+```
+
+After that add the following to your shell env (`~/.zshrc` is the default on macOS):
+
+```sh
+export PATH="$HOME/.kriol:$PATH"
+```
+
+Then close and reopen the terminal and try `kriol --version`.
+
+The macOS build compiles native programs only; `--target wasm32-wasi` is not
+available on it yet.
+
 ### Windows (experimental)
 
 > [!WARNING]
