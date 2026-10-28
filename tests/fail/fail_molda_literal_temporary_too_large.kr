@@ -1,0 +1,8 @@
+// expect: o valor temporário ocupa 1600000 bytes, mais do que o limite de 1048576 bytes; guarda-o numa variável declarada fora das funções
+molda Grandi {
+    int[200000] v;
+}
+
+fn inisiu() {
+    mostran(Grandi{v = [1; 200000]}.v[0]);
+}
