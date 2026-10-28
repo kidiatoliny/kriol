@@ -13,8 +13,10 @@ concurrency:
 
 env:
   LLVM_VERSION: 20.1.8
+  LLVM_SHA256: f229769f11d6a6edc8ada599c0cda964b7dee6ab1a08c6cf9dd7f513e85b107f
   LLVM_ROOT: C:\llvm\clang+llvm-20.1.8-x86_64-pc-windows-msvc
   MINGW_VERSION: '20260922'
+  MINGW_SHA256: 1e936a4a694fc27f9625e3311f5ec5d6d99abfeaa514fd41c52a4f8347145d1a
   MINGW_ROOT: C:\llvm-mingw\llvm-mingw-20260922-msvcrt-x86_64
   STAGE: kriol-windows-x86_64
 
@@ -48,7 +50,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: C:\llvm
-          key: llvm-${{ env.LLVM_VERSION }}-x86_64-pc-windows-msvc
+          key: llvm-${{ env.LLVM_VERSION }}-x86_64-pc-windows-msvc-${{ env.LLVM_SHA256 }}
 
       - name: Download LLVM
         if: steps.cache-llvm.outputs.cache-hit != 'true'
@@ -56,6 +58,8 @@ jobs:
         run: |
           $archive = "clang+llvm-$env:LLVM_VERSION-x86_64-pc-windows-msvc.tar.xz"
           curl.exe -fsSL -o llvm.tar.xz "https://github.com/llvm/llvm-project/releases/download/llvmorg-$env:LLVM_VERSION/$archive"
+          $hash = (Get-FileHash llvm.tar.xz -Algorithm SHA256).Hash
+          if ($hash -ne $env:LLVM_SHA256) { throw "SHA256 mismatch for ${archive}: got $hash, expected $env:LLVM_SHA256" }
           7z x llvm.tar.xz -so | 7z x -si -ttar -oC:\llvm -y | Out-Null
           Remove-Item llvm.tar.xz
 
@@ -64,7 +68,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: C:\llvm-mingw
-          key: llvm-mingw-${{ env.MINGW_VERSION }}-msvcrt-x86_64
+          key: llvm-mingw-${{ env.MINGW_VERSION }}-msvcrt-x86_64-${{ env.MINGW_SHA256 }}
 
       - name: Download llvm-mingw
         if: steps.cache-mingw.outputs.cache-hit != 'true'
@@ -72,6 +76,8 @@ jobs:
         run: |
           $archive = "llvm-mingw-$env:MINGW_VERSION-msvcrt-x86_64.zip"
           curl.exe -fsSL -o mingw.zip "https://github.com/mstorsjo/llvm-mingw/releases/download/$env:MINGW_VERSION/$archive"
+          $hash = (Get-FileHash mingw.zip -Algorithm SHA256).Hash
+          if ($hash -ne $env:MINGW_SHA256) { throw "SHA256 mismatch for ${archive}: got $hash, expected $env:MINGW_SHA256" }
           7z x mingw.zip -oC:\llvm-mingw -y | Out-Null
           Remove-Item mingw.zip
 
