@@ -1,0 +1,4 @@
+// exit: 255
+fn inisiu() {
+    sai(255);
+}

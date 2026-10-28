@@ -770,6 +770,10 @@ void SemanticAnalyzer::visit(FunCallExpr& node) {
                 if (t.valid() && !t.isInteger())
                     addError(loc + "o código de saída de 'sai' tem de ser um número inteiro, mas é do tipo '"
                              + t.str() + "'");
+                const auto code = integerLiteralValue(node.Args->Args[0].get());
+                if (code && (*code < 0 || *code > 255))
+                    addError(loc + "o código de saída de 'sai' tem de estar entre 0 e 255, mas é "
+                             + std::to_string(*code));
             }
             node.ResolvedType = Type::Void();
             return;

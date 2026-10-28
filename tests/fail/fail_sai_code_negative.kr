@@ -1,0 +1,5 @@
+// expect: o código de saída de 'sai' tem de estar entre 0 e 255, mas é -1
+// The system keeps only 8 bits of the exit code: -1 would exit with 255.
+fn inisiu() {
+    sai(-1);
+}
