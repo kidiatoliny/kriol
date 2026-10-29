@@ -692,3 +692,18 @@ void __kriol_check_div(int64_t lhs, int64_t rhs, int32_t signed_bits, int32_t li
             __kriol_panic_at("o resultado da divisão não cabe no tipo do número inteiro", line);
     }
 }
+
+/* The system keeps only the low 8 bits of the status, so 256 would exit with 0. */
+_Noreturn void __kriol_exit(int64_t code, int32_t is_signed, int32_t line) {
+    if (is_signed ? code < 0 || code > 255 : (uint64_t)code > 255) {
+        char message[128];
+        if (is_signed)
+            snprintf(message, sizeof message, "o código de saída de 'sai' tem de estar entre 0 e 255, mas é %lld",
+                     (long long)code);
+        else
+            snprintf(message, sizeof message, "o código de saída de 'sai' tem de estar entre 0 e 255, mas é %llu",
+                     (unsigned long long)(uint64_t)code);
+        __kriol_panic_at(message, line);
+    }
+    exit((int)code);
+}

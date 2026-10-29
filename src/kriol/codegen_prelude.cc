@@ -40,13 +40,14 @@ static llvm::Function* getOrDeclareRuntimeReadLine(llvm::Module& Mod, llvm::LLVM
     return llvm::Function::Create(ftype, llvm::Function::ExternalLinkage, "__kriol_read_line", Mod);
 }
 
-static llvm::Function* getOrDeclareExit(llvm::Module& Mod, llvm::LLVMContext& Context)
+static llvm::Function* getOrDeclareRuntimeExit(llvm::Module& Mod, llvm::LLVMContext& Context)
 {
-    if (auto* fn = Mod.getFunction("exit")) return fn;
+    if (auto* fn = Mod.getFunction("__kriol_exit")) return fn;
     auto* voidTy = llvm::Type::getVoidTy(Context);
+    auto* i64Ty  = llvm::Type::getInt64Ty(Context);
     auto* i32Ty  = llvm::Type::getInt32Ty(Context);
-    auto* ftype  = llvm::FunctionType::get(voidTy, {i32Ty}, false);
-    auto* fn = llvm::Function::Create(ftype, llvm::Function::ExternalLinkage, "exit", Mod);
+    auto* ftype  = llvm::FunctionType::get(voidTy, {i64Ty, i32Ty, i32Ty}, false);
+    auto* fn = llvm::Function::Create(ftype, llvm::Function::ExternalLinkage, "__kriol_exit", Mod);
     fn->addFnAttr(llvm::Attribute::NoReturn);
     return fn;
 }
@@ -183,14 +184,23 @@ bool CodeGenVisitor::emitPreludeCall(ast::FunCallExpr& node, const std::string& 
         }
 
         case prelude::Builtin::Sai: {
+            auto* i64Ty = llvm::Type::getInt64Ty(Context);
             auto* i32Ty = llvm::Type::getInt32Ty(Context);
-            llvm::Value* code = llvm::ConstantInt::get(i32Ty, 0);
+            llvm::Value* code = llvm::ConstantInt::get(i64Ty, 0);
+            bool isSigned = true;
             if (node.Args && !node.Args->Args.empty() && node.Args->Args[0]) {
                 node.Args->Args[0]->accept(*this);
-                if (LastValue)
-                    code = coerceToType(LastValue, node.Args->Args[0]->ResolvedType, Type::SignedInteger(32));
+                if (LastValue) {
+                    isSigned = node.Args->Args[0]->ResolvedType.isSigned();
+                    code = isSigned ? Builder->CreateSExtOrTrunc(LastValue, i64Ty)
+                                    : Builder->CreateZExtOrTrunc(LastValue, i64Ty);
+                }
             }
-            Builder->CreateCall(getOrDeclareExit(*Mod, Context), {code});
+            Builder->CreateCall(getOrDeclareRuntimeExit(*Mod, Context), {
+                code,
+                llvm::ConstantInt::get(i32Ty, isSigned ? 1 : 0),
+                llvm::ConstantInt::get(i32Ty, node.LineNum)
+            });
             Builder->CreateUnreachable();
             // Statements after sai() are unreachable; emit them into a fresh
             // dead block so the current block keeps a single terminator.

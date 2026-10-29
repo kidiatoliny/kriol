@@ -1,0 +1,5 @@
+// exit: 255
+fn inisiu() {
+    u8 code = 255;
+    sai(code);
+}

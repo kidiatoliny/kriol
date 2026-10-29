@@ -1,0 +1,5 @@
+// expect: :4: erro de execução: o código de saída de 'sai' tem de estar entre 0 e 255, mas é -1
+fn inisiu() {
+    i8 code = -1;
+    sai(code);
+}
