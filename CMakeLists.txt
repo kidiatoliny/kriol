@@ -595,6 +595,7 @@ add_custom_target(
     COMMAND
         $<TARGET_FILE:kriol_compile_fuzz_smoke>
     COMMAND
+        ${CMAKE_COMMAND} -E env KRIOL_ENABLE_WASM=$<BOOL:${KRIOL_ENABLE_WASM}>
         ${CMAKE_SOURCE_DIR}/run_tests.sh
         $<TARGET_FILE:kriol>
         ${CMAKE_SOURCE_DIR}

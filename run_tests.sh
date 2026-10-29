@@ -294,7 +294,19 @@ if [ -d "$ROOT/tests/fail" ]; then
 fi
 
 # ---- wasm32-wasi compile checks --------------------------------------------
-if "$KRIOL" --target wasm32-wasi --text 'fn inisiu() {}' --emit-ir >/dev/null 2>&1; then
+# KRIOL_ENABLE_WASM=1 (set by the CMake check target) makes the wasm tests required.
+wasm_tests_unavailable() {
+    if [ "${KRIOL_ENABLE_WASM:-}" = 1 ]; then
+        printf "  %-44s FAIL (%s)\n" "wasm32-wasi tests" "$1"
+        record_failure "wasm32-wasi tests: $1, but KRIOL_ENABLE_WASM is ON"
+    else
+        echo "  Skipping wasm32-wasi tests: $1"
+    fi
+}
+
+if ! "$KRIOL" --target wasm32-wasi --text 'fn inisiu() {}' --emit-ir >/dev/null 2>&1; then
+    wasm_tests_unavailable "kriol cannot compile for wasm32-wasi"
+else
     printf "  %-44s" "wasm32-wasi hello_world"
     tmpwasm=$(mktemp /tmp/kriol_wasm_XXXX.wasm)
     if "$KRIOL" "$ROOT/examples/hello_world.kriol" --target wasm32-wasi -o "$tmpwasm" 2>/dev/null; then
@@ -330,6 +342,8 @@ if "$KRIOL" --target wasm32-wasi --text 'fn inisiu() {}' --emit-ir >/dev/null 2>
         for f in "${PANICS[@]}"; do
             program_test "$f" wasm32-wasi stops_as_expected "wasm: ${f#"$ROOT"/}"
         done
+    else
+        wasm_tests_unavailable "node is not on the PATH"
     fi
 fi
 
